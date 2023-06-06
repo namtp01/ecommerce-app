@@ -12,7 +12,7 @@ import Container from './../components/Container';
 const SingleProduct = () =>
 {
     const props = { width: 400, height: 600, zoomWidth: 600, img: "https://images.pexels.com/photos/190819/pexels-photo-190819.jpeg?cs=srgb&dl=pexels-fernando-arcos-190819.jpg&fm=jpg" };
-    const [orderedProduct, setOrderedProduct] = useState(true);
+    const [orderedProduct] = useState(true);
     const copyToClipboard = (text) =>
     {
         console.log("text", text);
@@ -124,7 +124,7 @@ const SingleProduct = () =>
                                 </div>
                                 <div className='d-flex gap-10 align-items-center my-3'>
                                     <h3 className='product-heading'>Product Link</h3>
-                                    <a href='javascript:void(0);' onClick={() => { copyToClipboard("https://images.pexels.com/photos/190819/pexels-photo-190819.jpeg?cs=srgb&dl=pexels-fernando-arcos-190819.jpg&fm=jpg"); }}>
+                                    <a href="/" onClick={() => { copyToClipboard("https://images.pexels.com/photos/190819/pexels-photo-190819.jpeg?cs=srgb&dl=pexels-fernando-arcos-190819.jpg&fm=jpg"); }}>
                                         Copy Product Link
                                     </a>
                                 </div>
