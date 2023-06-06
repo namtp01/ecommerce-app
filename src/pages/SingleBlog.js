@@ -4,6 +4,7 @@ import BreadCrumb from './../components/BreadCrumb';
 import { Link } from 'react-router-dom';
 import { HiOutlineArrowLeft } from "react-icons/hi";
 import Container from './../components/Container';
+import blog01 from '../images/blog-1.jpg';
 
 const SingleBlog = () =>
 {
@@ -22,7 +23,7 @@ const SingleBlog = () =>
                             <h3 className="title">
                                 A Beautiful Sunday Morning Renaissance
                             </h3>
-                            <img src="images/blog-1.jpg" className='img-fluid w-100 my-4' alt="blog" />
+                            <img src={blog01} className='img-fluid w-100 my-4' alt="blog" />
                             <p>
                                 You're only as good as your last collection, which is an enormous pressure.
                                 I think there is something about luxury it's not something people need, but it's what they want.
@@ -33,7 +34,7 @@ const SingleBlog = () =>
                 </div>
             </Container>
         </>
-    )
-}
+    );
+};
 
 export default SingleBlog;
