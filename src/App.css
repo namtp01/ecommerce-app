@@ -76,6 +76,11 @@ a {
   color: var(--color-131921);
 }
 
+.error {
+  color: red;
+  font-size: 12px;
+}
+
 /* Header Parts */
 
 .header-top-strip {

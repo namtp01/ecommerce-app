@@ -1,10 +1,149 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom';
 import { BiArrowBack } from "react-icons/bi";
 import Container from './../components/Container';
+import { useDispatch, useSelector } from 'react-redux';
+import { useFormik } from 'formik';
+import * as yup from 'yup';
+import axios from 'axios';
+import { config } from '../utils/axiosConfig';
+import { createAnOrder } from '../features/user/userSlice';
+
+const schema = yup.object().shape({
+    firstname: yup.string().required('First Name is required'),
+    lastname: yup.string().required('Last Name is required'),
+    address: yup.string().required('Address Details are required'),
+    state: yup.string().required('State is required'),
+    city: yup.string().required('City is required'),
+    country: yup.string().required('Country is required'),
+    pincode: yup.string().required('Pincode is required'),
+});
 
 const Checkout = () =>
 {
+    const dispatch = useDispatch();
+    const [totalAmount, setTotalAmount] = useState(null);
+    const cartState = useSelector((state) => state?.auth?.cartProducts);
+
+    const [shippingInfo, setShippingInfo] = useState(null);
+    const [paymentInfo, setPaymentInfo] = useState({razorpayPaymentId: "", razorpayOrderId: ""});
+    const [cartProductState, setCartProductState] = useState([]);
+
+    // Visa: 4111111111111111
+
+
+    useEffect(() =>
+    {
+        let sum = 0;
+        for (let index = 0; index < cartState?.length; index++) {
+            sum = sum + (Number(cartState[index]?.quantity) * cartState[index]?.price);
+            setTotalAmount(sum);
+        }
+    }, [cartState]);
+
+    const formik = useFormik({
+        initialValues: {
+            firstname: "",
+            lastname: "",
+            address: "",
+            state: "",
+            city: "",
+            country: "",
+            pincode: "",
+            other: ""
+        },
+        validationSchema: schema,
+        onSubmit: (values) => {
+            setShippingInfo(values);
+            setTimeout(() => {
+                checkOutHandler();
+            }, 100);
+        }
+    });
+    console.log(shippingInfo);
+
+    const loadScript = (src) => {
+        return new Promise((resolve) => {
+            const script = document.createElement("script");
+            script.src = src;
+            script.onload = () => {
+                resolve(true);
+            };
+            script.onerror = () => {
+                resolve(false);
+            }
+            document.body.appendChild(script);
+        });
+    };
+
+    useEffect(() => {
+        let items = [];
+        for (let index = 0; index < cartState?.length; index++) {
+            items.push({
+                product: cartState[index]?.productId._id, 
+                quantity: cartState[index]?.quantity, 
+                color: cartState[index]?.color._id,
+                price: cartState[index]?.price
+            });
+        }
+        setCartProductState(items);
+    }, [cartState]);
+
+    const checkOutHandler = async () => {
+        const res = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
+        if (!res) {
+            alert('Razorpay failed');
+            return;
+        }
+        const result = await axios.post("http://localhost:5000/api/user/order/checkout",{amount: totalAmount+5}, config);
+        if (!result) {
+            alert('Something Went Wrong');
+            return;
+        }
+
+        const { amount, id: order_id, currency } = result.data.order;
+        const options = {
+            key: "rzp_test_w4tqOrG2fKOVFL",
+            amount: amount,
+            currency: currency,
+            name: "Nam Tran Corp.",
+            description: "Test Transaction",
+            // image: { logo },
+            order_id: order_id,
+            handler: async function (response) {
+                const data = {
+                    orderCreationId: order_id,
+                    razorpayPaymentId: response?.razorpay_payment_id,
+                    razorpayOrderId: response?.razorpay_order_id,
+                };
+
+                const result = await axios.post("http://localhost:5000/api/user/order/paymentVerification", data, config);
+
+                setPaymentInfo({ 
+                    razorpayPaymentId: result?.razorpay_payment_id,
+                    razorpayOrderId: result?.razorpay_order_id,
+                });
+                //setPaymentInfo(result.data);
+
+                dispatch(createAnOrder({totalPrice: totalAmount, totalPriceAfterDiscount: totalAmount, orderItems:cartProductState, paymentInfo, shippingInfo}))
+            },
+            prefill: {
+                name: "Nam Tran",
+                email: "namtp2812@gmail.com",
+                contact: "038106548395",
+            },
+            notes: {
+                address: "Nam Tran Office"
+            },
+            theme: {
+                color: "#61dafb"
+            }
+        };
+
+        const paymentObject = new window.Razorpay(options);
+        paymentObject.open();
+    };
+
     return (
         <>
             <Container class1="checkout-wrapper py-5 home-wrapper-2">
@@ -39,34 +178,85 @@ const Checkout = () =>
                                 Nam Tran (namtp2812@gmail.com)
                             </p>
                             <h4 className='mb-3'>Shipping Address</h4>
-                            <form action="" className='d-flex gap-15 flex-wrap justify-content-between'>
+                            <form onSubmit={formik.handleSubmit} action="" className='d-flex gap-15 flex-wrap justify-content-between'>
                                 <div className='w-100'>
-                                    <select name="" className='form-control form-select' id="">
+                                    <select name="country" className='form-control form-select' id=""
+                                        onChange={formik.handleChange("country")} 
+                                        onBlur={formik.handleBlur("country")}
+                                        value={formik.values.country}
+                                    >
                                         <option value="" selected disabled>Selected Country</option>
+                                        <option value="Vietnam">Vietnam</option>
                                     </select>
+                                    <div className="error ms-2 my-1">{formik.touched.country && formik.errors.country}</div>
                                 </div>
                                 <div className='flex-grow-1'>
-                                    <input type="text" placeholder='First Name' className="form-control" />
+                                    <input type="text" placeholder='First Name' className="form-control" 
+                                        name='firstname'
+                                        onChange={formik.handleChange("firstname")} 
+                                        onBlur={formik.handleBlur("firstname")}
+                                        value={formik.values.firstname}
+                                    />
+                                    <div className="error ms-2 my-1">{formik.touched.firstname && formik.errors.firstname}</div>
                                 </div>
                                 <div className='flex-grow-1'>
-                                    <input type="text" placeholder='Last Name' className="form-control" />
+                                    <input type="text" placeholder='Last Name' className="form-control" 
+                                        name='lastname'
+                                        onChange={formik.handleChange("lastname")} 
+                                        onBlur={formik.handleBlur("lastname")}
+                                        value={formik.values.lastname}
+                                    />
+                                    <div className="error ms-2 my-1">{formik.touched.lastname && formik.errors.lastname}</div>
                                 </div>
                                 <div className='w-100'>
-                                    <input type="text" placeholder='Address' className="form-control" />
+                                    <input type="text" placeholder='Address' className="form-control" 
+                                        name='address'
+                                        onChange={formik.handleChange("address")} 
+                                        onBlur={formik.handleBlur("address")}
+                                        value={formik.values.address}
+                                    />
+                                    <div className="error ms-2 my-1">{formik.touched.address && formik.errors.address}</div>
                                 </div>
                                 <div className='w-100'>
-                                    <input type="text" placeholder='Apartment, Suite, etc' className="form-control" />
+                                    <input type="text" placeholder='Apartment, Suite, etc' className="form-control" 
+                                        name='other'
+                                        onChange={formik.handleChange("other")} 
+                                        onBlur={formik.handleBlur("other")}
+                                        value={formik.values.other}
+                                    />
+                                    <div className="error ms-2 my-1">{formik.touched.other && formik.errors.other}</div>
                                 </div>
                                 <div className='flex-grow-1'>
-                                    <input type="text" placeholder='City' className="form-control" />
+                                    <input type="text" placeholder='City' className="form-control" 
+                                        name='city'
+                                        onChange={formik.handleChange("city")} 
+                                        onBlur={formik.handleBlur("city")}
+                                        value={formik.values.city}
+                                    />
+                                    <div className="error ms-2 my-1">{formik.touched.city && formik.errors.city}</div>
                                 </div>
                                 <div className='flex-grow-1'>
-                                    <select name="" className='form-control form-select' id="">
+                                    <select className='form-control form-select' id=""
+                                        name='state'
+                                        onChange={formik.handleChange("state")} 
+                                        onBlur={formik.handleBlur("state")}
+                                        value={formik.values.state}
+                                    >
                                         <option value="" selected disabled>Selected State</option>
+                                        <option value="HCMC">HCMC</option>
+                                        <option value="Hanoi">Hanoi</option>
+                                        <option value="Danang">Danang</option>
                                     </select>
+                                    <div className="error ms-2 my-1">{formik.touched.state && formik.errors.state}</div>
                                 </div>
                                 <div className='flex-grow-1'>
-                                    <input type="text" placeholder='Zipcode' className="form-control" />
+                                    <input type="text" placeholder='Zipcode' className="form-control" 
+                                        name='pincode'
+                                        onChange={formik.handleChange("pincode")} 
+                                        onBlur={formik.handleBlur("pincode")}
+                                        value={formik.values.pincode}
+                                    />
+                                    <div className="error ms-2 my-1">{formik.touched.pincode && formik.errors.pincode}</div>
                                 </div>
                                 <div className="w-100">
                                     <div className="d-flex justify-content-between align-items-center">
@@ -75,6 +265,7 @@ const Checkout = () =>
                                             Return to Cart
                                         </Link>
                                         <Link to="/cart" className='button'>Continue to Shipping</Link>
+                                        <button className='button' type='submit'>Place Order</button>
                                     </div>
                                 </div>
                             </form>
@@ -82,35 +273,46 @@ const Checkout = () =>
                     </div>
                     <div className="col-5">
                         <div className='border-bottom py-4'>
-                            <div className="d-flex gap-10 mb-2 align-items-center">
-                                <div className='w-75 d-flex gap-10'>
-                                    <div className='w-25 position-relative'>
-                                        <span style={{ top: "-10px", right: "2px" }} className="badge bg-secondary text-white rounded-circle p-2 position-absolute">1</span>
-                                        <img src="images/watch.jpg" className='img-fluid' alt="product" />
-                                    </div>
-                                    <div>
-                                        <h5 className="total-price">Kid Bulk</h5>
-                                        <p className='total-price'>s / #vvsf</p>
-                                    </div>
-                                </div>
-                                <div className='flex-grow-1'>
-                                    <h5 className='total'>$ 100</h5>
-                                </div>
-                            </div>
+                            {
+                                cartState && cartState?.map((item, index) =>
+                                {
+                                    return (
+                                        <div key={index} className="d-flex gap-10 mb-2 align-items-center">
+                                            <div className='w-75 d-flex gap-10'>
+                                                <div className='w-25 position-relative'>
+                                                    <span style={{ top: "-10px", right: "2px" }} 
+                                                        className="badge bg-secondary text-white rounded-circle p-2 position-absolute"
+                                                    >
+                                                        {item?.quantity}
+                                                    </span>
+                                                    <img src={item?.productId?.images[0].url} width={100} height={100} alt="product" />
+                                                </div>
+                                                <div>
+                                                    <h5 className="total-price">{item?.productId?.title}</h5>
+                                                    <p className='total-price'>{item?.color?.title}</p>
+                                                </div>
+                                            </div>
+                                            <div className='flex-grow-1'>
+                                                <h5 className='total'>$ {item?.price * item?.quantity}</h5>
+                                            </div>
+                                        </div>
+                                    )
+                                })
+                            }
                         </div>
                         <div className='border-bottom py-4'>
                             <div className='d-flex justify-content-between align-items-center'>
                                 <p className='total'>Subtotal</p>
-                                <p className='total-price'>$ 1000</p>
+                                <p className='total-price'>$ {totalAmount ? totalAmount : "0"}</p>
                             </div>
                             <div className='d-flex justify-content-between align-items-center'>
                                 <p className='mb-0 total'>Shipping</p>
-                                <p className='mb-0 total-price'>$ 1000</p>
+                                <p className='mb-0 total-price'>$ 5</p>
                             </div>
                         </div>
                         <div className='d-flex justify-content-between align-items-center border-bottom py-4'>
                             <h4 className='total'>Total</h4>
-                            <h5 className='total-price'>$ 1000</h5>
+                            <h5 className='total-price'>$ {totalAmount ? totalAmount+5 : "0"}</h5>
                         </div>
                     </div>
                 </div>
